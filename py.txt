@@ -1,0 +1,78 @@
+import csv
+import requests
+
+# Enter your GitHub access token here
+ACCESS_TOKEN = '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'
+
+# Enter the repository name here
+REPO_NAME = 'PercyJH01/Github-repo-settings-retrieval'
+
+# Fetch repository details using GitHub REST API
+url = f'https://api.github.com/repos/{REPO_NAME}'
+headers = {'Authorization': f'token {ACCESS_TOKEN}'}
+response = requests.get(url, headers=headers)
+
+if response.status_code == 200:
+    repo_data = response.json()
+
+    # Retrieve the repo details
+    repo_name = repo_data['name']
+    repo_url = repo_data['html_url']
+
+    # Fetch collaborators using GitHub REST API
+    collaborators_url = f'https://api.github.com/repos/{REPO_NAME}/collaborators'
+    response = requests.get(collaborators_url, headers=headers)
+    if response.status_code == 200:
+        collaborators_data = response.json()
+        collaborators = [collaborator['login'] for collaborator in collaborators_data]
+        member_roles = [collaborator['type'] for collaborator in collaborators_data]
+
+    default_branch = repo_data['default_branch']
+
+    # Fetch branch protection rules using GitHub REST API
+    branch_protection_url = f'https://api.github.com/repos/{REPO_NAME}/branches'
+    response = requests.get(branch_protection_url, headers=headers)
+    branch_protection_rules = {}
+    if response.status_code == 200:
+        branches_data = response.json()
+        for branch in branches_data:
+            branch_name = branch['name']
+            branch_protection_url = f"https://api.github.com/repos/{REPO_NAME}/branches/{branch_name}/protection"
+            response = requests.get(branch_protection_url, headers=headers)
+            if response.status_code == 200:
+                protection_data = response.json()
+                if 'required_status_checks' in protection_data:
+                    rules = protection_data['required_status_checks']['contexts']
+                    branch_protection_rules[branch_name] = rules
+                else:
+                    branch_protection_rules[branch_name] = []
+
+    # Fetch tags using GitHub REST API
+    tags_url = f'https://api.github.com/repos/{REPO_NAME}/tags'
+    response = requests.get(tags_url, headers=headers)
+    tags = []
+    if response.status_code == 200:
+        tags_data = response.json()
+        tags = [tag['name'] for tag in tags_data]
+
+    # Prepare the data to be saved in CSV
+    data = {
+        'Repo Name': repo_name,
+        'Repo Url': repo_url,
+        'Collaborators': collaborators,
+        'Member Roles': member_roles,
+        'Default Branch': default_branch,
+        'Branch Protection Rules': branch_protection_rules,
+        'Tags': tags
+    }
+
+    # Save the data in a CSV file
+    csv_filename = 'repo_details.csv'
+    with open(csv_filename, 'w', newline='') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=data.keys())
+        writer.writeheader()
+        writer.writerow(data)
+
+    print(f'Repo details saved in {csv_filename} file.')
+else:
+    print('Failed to fetch repository details.')
